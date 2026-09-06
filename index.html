@@ -1,13 +1,80 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>JOTIOS WRLD — 3D AR</title>
-  <meta http-equiv="refresh" content="0; url=./JOTIOS_AR_3D_MODEL/">
-  <script>window.location.replace('./JOTIOS_AR_3D_MODEL/');</script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#000000" />
+  <title>JOTIOS WRLD — 3D AR Experience</title>
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/aframe-extras@7.5.0/dist/aframe-extras.min.js"></script>
+  <script>
+    AFRAME.registerComponent('auto-fit-model', {
+      schema: { height: {default: 1.35}, yOffset: {default: 0.02} },
+      init: function () {
+        this.el.addEventListener('model-loaded', () => {
+          const obj = this.el.getObject3D('mesh');
+          if (!obj) return;
+          obj.updateMatrixWorld(true);
+          const box = new THREE.Box3().setFromObject(obj);
+          const size = new THREE.Vector3();
+          box.getSize(size);
+          if (!isFinite(size.y) || size.y <= 0) return;
+          const scale = this.data.height / size.y;
+          this.el.object3D.scale.setScalar(scale);
+          obj.updateMatrixWorld(true);
+          const scaledBox = new THREE.Box3().setFromObject(obj);
+          const center = new THREE.Vector3();
+          scaledBox.getCenter(center);
+          this.el.object3D.position.x -= center.x;
+          this.el.object3D.position.z -= center.z;
+          this.el.object3D.position.y += (-scaledBox.min.y) + this.data.yOffset;
+        });
+      }
+    });
+  </script>
+  <style>
+    *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent;font-family:Arial,Helvetica,sans-serif}a-scene,.a-canvas{background:transparent!important}
+    #loading{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;padding:24px;background:#05060a;color:#fff;text-align:center}
+    #loading .box{max-width:420px}#loading img{width:min(58vw,230px);max-height:42vh;object-fit:contain;border-radius:16px}#loading h1{margin:18px 0 8px;font-size:1.2rem}#loading p{margin:0;opacity:.8;line-height:1.4}
+    #ui{position:fixed;inset:0;z-index:20;pointer-events:none;display:flex;flex-direction:column;justify-content:space-between;padding:18px;color:#fff}.brand,#message{align-self:center;background:rgba(0,0,0,.62);padding:9px 13px;border-radius:14px;text-align:center}.brand{font-weight:800;font-size:.78rem;letter-spacing:.08em}#message{max-width:430px;font-size:.93rem}
+  </style>
 </head>
 <body>
-  <p>Opening JOTIOS WRLD 3D AR…</p>
+  <div id="loading"><div class="box"><img src="./JOTIOS_AR_3D_MODEL/jotios-target.png" alt="JOTIOS WRLD artwork"><h1>JOTIOS WRLD 3D AR</h1><p id="loadingText">Starting camera…</p></div></div>
+  <div id="ui"><div class="brand">JOTIOS WRLD • 3D AR</div><div></div><div id="message">Point your camera at the JOTIOS WRLD artwork.</div></div>
+
+  <a-scene id="scene"
+    mindar-image="imageTargetSrc: ./JOTIOS_AR_3D_MODEL/targets.mind; autoStart: true; filterMinCF: 0.001; filterBeta: 0.01; missTolerance: 8; warmupTolerance: 5;"
+    embedded
+    renderer="colorManagement: true; antialias: true; alpha: true"
+    vr-mode-ui="enabled: false"
+    device-orientation-permission-ui="enabled: false">
+    <a-assets timeout="30000"><a-asset-item id="jotiosModel" src="./JOTIOS_AR_3D_MODEL/ultimate-blue-model.glb"></a-asset-item></a-assets>
+    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+    <a-entity id="target" mindar-image-target="targetIndex: 0">
+      <a-entity position="0 0 0.08">
+        <a-entity id="model" gltf-model="#jotiosModel" animation-mixer="clip: *; loop: repeat" auto-fit-model="height: 1.35; yOffset: 0.02"></a-entity>
+      </a-entity>
+    </a-entity>
+  </a-scene>
+
+  <script>
+    const loading=document.getElementById('loading');
+    const loadingText=document.getElementById('loadingText');
+    const message=document.getElementById('message');
+    const scene=document.getElementById('scene');
+    const target=document.getElementById('target');
+    const model=document.getElementById('model');
+
+    scene.addEventListener('arReady',()=>{loading.style.display='none';message.textContent='Point your camera at the JOTIOS WRLD artwork.';});
+    scene.addEventListener('arError',()=>{loadingText.textContent='Camera/AR could not start. Make sure camera permission is allowed, then refresh.';});
+    model.addEventListener('model-loaded',()=>{message.textContent='Model loaded. Point your camera at the JOTIOS WRLD artwork.';});
+    model.addEventListener('model-error',()=>{loading.style.display='none';message.textContent='3D model failed to load. Please refresh and try again.';});
+    target.addEventListener('targetFound',()=>{message.textContent='Artwork detected — 3D character activated.';});
+    target.addEventListener('targetLost',()=>{message.textContent='Point your camera at the JOTIOS WRLD artwork.';});
+
+    setTimeout(()=>{if(loading.style.display!=='none') loadingText.textContent='Still loading… if prompted, allow camera access.';},10000);
+  </script>
 </body>
 </html>
