@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#05060a" />
+  <title>JOTIOS WRLD — 3D AR Experience</title>
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/aframe-extras@7.5.0/dist/aframe-extras.min.js"></script>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html, body { margin:0; width:100%; height:100%; overflow:hidden; background:transparent; font-family:Arial,Helvetica,sans-serif; }
+    a-scene, .a-canvas { background:transparent !important; }
+    #loading { position:fixed; inset:0; z-index:30; display:flex; align-items:center; justify-content:center; padding:24px; background:#05060a; text-align:center; }
+    #loading .box { max-width:420px; }
+    #loading img { width:min(58vw,230px); max-height:42vh; object-fit:contain; border-radius:16px; }
+    #loading h1 { margin:18px 0 8px; letter-spacing:.08em; font-size:1.2rem; }
+    #loading p { margin:0; opacity:.75; line-height:1.4; font-size:.94rem; }
+    #ui { position:fixed; inset:0; z-index:20; pointer-events:none; display:flex; flex-direction:column; justify-content:space-between; padding:max(18px,env(safe-area-inset-top)) 18px max(22px,env(safe-area-inset-bottom)); }
+    .brand { align-self:center; padding:8px 12px; border-radius:999px; background:rgba(0,0,0,.54); backdrop-filter:blur(8px); font-weight:800; letter-spacing:.11em; font-size:.76rem; }
+    .scan-wrap { flex:1; display:grid; place-items:center; }
+    .scan-frame { width:min(72vw,340px); aspect-ratio:1272/2048; position:relative; opacity:.96; }
+    .scan-frame::before,.scan-frame::after,.corner2,.corner3 { content:""; position:absolute; width:34px; height:34px; border-color:white; border-style:solid; filter:drop-shadow(0 2px 8px rgba(0,0,0,.6)); }
+    .scan-frame::before { left:0; top:0; border-width:3px 0 0 3px; }
+    .scan-frame::after { right:0; top:0; border-width:3px 3px 0 0; }
+    .corner2 { left:0; bottom:0; border-width:0 0 3px 3px; }
+    .corner3 { right:0; bottom:0; border-width:0 3px 3px 0; }
+    #message { align-self:center; max-width:430px; text-align:center; padding:11px 15px; border-radius:14px; background:rgba(0,0,0,.62); backdrop-filter:blur(8px); font-size:.93rem; line-height:1.35; }
+  </style>
+</head>
+<body>
+  <div id="loading"><div class="box">
+    <img src="jotios-target.png" alt="JOTIOS WRLD target artwork">
+    <h1>JOTIOS WRLD 3D AR</h1>
+    <p>Allow camera access, then point your phone at the Special Edition artwork.</p>
+  </div></div>
+
+  <div id="ui" aria-live="polite">
+    <div class="brand">JOTIOS WRLD • 3D AR</div>
+    <div class="scan-wrap"><div class="scan-frame"><span class="corner2"></span><span class="corner3"></span></div></div>
+    <div id="message">Point your camera at the JOTIOS WRLD artwork.</div>
+  </div>
+
+  <a-scene
+    mindar-image="imageTargetSrc: ./targets.mind; autoStart: true; filterMinCF: 0.001; filterBeta: 0.01; missTolerance: 8; warmupTolerance: 5;"
+    embedded
+    color-space="sRGB"
+    renderer="colorManagement: true; physicallyCorrectLights: true; antialias: true; alpha: true"
+    vr-mode-ui="enabled: false"
+    device-orientation-permission-ui="enabled: false">
+
+    <a-assets timeout="30000">
+      <a-asset-item id="jotiosModel" src="ultimate-blue-model.glb"></a-asset-item>
+    </a-assets>
+
+    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+    <a-entity id="target" mindar-image-target="targetIndex: 0">
+      <a-entity id="modelRoot" position="0 0 0.08" rotation="0 0 0">
+        <a-entity
+          id="model"
+          gltf-model="#jotiosModel"
+          animation-mixer="clip: *; loop: repeat"
+          auto-fit-model="height: 1.35; yOffset: 0.02">
+        </a-entity>
+      </a-entity>
+    </a-entity>
+  </a-scene>
+
+  <script>
+    AFRAME.registerComponent('auto-fit-model', {
+      schema: { height: {default: 1.35}, yOffset: {default: 0} },
+      init: function () {
+        this.el.addEventListener('model-loaded', () => {
+          const obj = this.el.getObject3D('mesh');
+          if (!obj) return;
+
+          obj.updateMatrixWorld(true);
+          const box = new THREE.Box3().setFromObject(obj);
+          const size = new THREE.Vector3();
+          const center = new THREE.Vector3();
+          box.getSize(size);
+          box.getCenter(center);
+
+          const maxDim = Math.max(size.x, size.y, size.z);
+          if (!isFinite(maxDim) || maxDim <= 0) return;
+
+          const scale = this.data.height / Math.max(size.y, maxDim * 0.7);
+          this.el.object3D.scale.setScalar(scale);
+
+          // Recompute bounds after scaling, then center the model on the target.
+          obj.updateMatrixWorld(true);
+          const scaledBox = new THREE.Box3().setFromObject(obj);
+          const scaledCenter = new THREE.Vector3();
+          scaledBox.getCenter(scaledCenter);
+          const scaledMin = scaledBox.min;
+
+          this.el.object3D.position.x -= scaledCenter.x;
+          this.el.object3D.position.z -= scaledCenter.z;
+          this.el.object3D.position.y += (-scaledMin.y) + this.data.yOffset;
+        });
+      }
+    });
+
+    const loading = document.getElementById('loading');
+    const message = document.getElementById('message');
+    const target = document.getElementById('target');
+    const model = document.getElementById('model');
+
+    window.addEventListener('load', () => setTimeout(() => loading.style.display = 'none', 1500));
+
+    model.addEventListener('model-loaded', () => {
+      message.textContent = 'Model loaded. Point your camera at the JOTIOS WRLD artwork.';
+    });
+
+    model.addEventListener('model-error', () => {
+      message.textContent = 'The 3D model could not load. Refresh and try again.';
+    });
+
+    target.addEventListener('targetFound', () => {
+      message.textContent = 'Artwork detected — 3D character activated.';
+    });
+
+    target.addEventListener('targetLost', () => {
+      message.textContent = 'Point your camera at the JOTIOS WRLD artwork.';
+    });
+  </script>
+</body>
+</html>
