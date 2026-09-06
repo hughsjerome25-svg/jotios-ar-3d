@@ -8,6 +8,37 @@
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/aframe-extras@7.5.0/dist/aframe-extras.min.js"></script>
+  <script>
+    AFRAME.registerComponent('auto-fit-model', {
+      schema: { height: {default: 1.35}, yOffset: {default: 0} },
+      init: function () {
+        this.el.addEventListener('model-loaded', () => {
+          const obj = this.el.getObject3D('mesh');
+          if (!obj) return;
+
+          this.el.object3D.updateMatrixWorld(true);
+          const box = new THREE.Box3().setFromObject(obj);
+          const size = new THREE.Vector3();
+          box.getSize(size);
+
+          if (!isFinite(size.y) || size.y <= 0) return;
+
+          const scale = this.data.height / size.y;
+          this.el.object3D.scale.setScalar(scale);
+          this.el.object3D.updateMatrixWorld(true);
+
+          const scaledBox = new THREE.Box3().setFromObject(obj);
+          const scaledCenter = new THREE.Vector3();
+          scaledBox.getCenter(scaledCenter);
+
+          this.el.object3D.position.x -= scaledCenter.x;
+          this.el.object3D.position.z -= scaledCenter.z;
+          this.el.object3D.position.y += (-scaledBox.min.y) + this.data.yOffset;
+          this.el.object3D.updateMatrixWorld(true);
+        });
+      }
+    });
+  </script>
   <style>
     :root { color-scheme: dark; }
     * { box-sizing: border-box; }
@@ -70,46 +101,25 @@
   </a-scene>
 
   <script>
-    AFRAME.registerComponent('auto-fit-model', {
-      schema: { height: {default: 1.35}, yOffset: {default: 0} },
-      init: function () {
-        this.el.addEventListener('model-loaded', () => {
-          const obj = this.el.getObject3D('mesh');
-          if (!obj) return;
-
-          obj.updateMatrixWorld(true);
-          const box = new THREE.Box3().setFromObject(obj);
-          const size = new THREE.Vector3();
-          const center = new THREE.Vector3();
-          box.getSize(size);
-          box.getCenter(center);
-
-          const maxDim = Math.max(size.x, size.y, size.z);
-          if (!isFinite(maxDim) || maxDim <= 0) return;
-
-          const scale = this.data.height / Math.max(size.y, maxDim * 0.7);
-          this.el.object3D.scale.setScalar(scale);
-
-          // Recompute bounds after scaling, then center the model on the target.
-          obj.updateMatrixWorld(true);
-          const scaledBox = new THREE.Box3().setFromObject(obj);
-          const scaledCenter = new THREE.Vector3();
-          scaledBox.getCenter(scaledCenter);
-          const scaledMin = scaledBox.min;
-
-          this.el.object3D.position.x -= scaledCenter.x;
-          this.el.object3D.position.z -= scaledCenter.z;
-          this.el.object3D.position.y += (-scaledMin.y) + this.data.yOffset;
-        });
-      }
-    });
-
     const loading = document.getElementById('loading');
     const message = document.getElementById('message');
     const target = document.getElementById('target');
     const model = document.getElementById('model');
+    const scene = document.querySelector('a-scene');
 
-    window.addEventListener('load', () => setTimeout(() => loading.style.display = 'none', 1500));
+    scene.addEventListener('arReady', () => {
+      loading.style.display = 'none';
+      message.textContent = 'Point your camera at the JOTIOS WRLD artwork.';
+    });
+
+    scene.addEventListener('arError', () => {
+      loading.style.display = 'none';
+      message.textContent = 'Camera or AR could not start. Check camera permission and refresh.';
+    });
+
+    setTimeout(() => {
+      if (loading.style.display !== 'none') loading.style.display = 'none';
+    }, 8000);
 
     model.addEventListener('model-loaded', () => {
       message.textContent = 'Model loaded. Point your camera at the JOTIOS WRLD artwork.';
